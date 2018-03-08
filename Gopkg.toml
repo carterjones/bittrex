@@ -1,0 +1,11 @@
+[[constraint]]
+  branch = "master"
+  name = "github.com/carterjones/signalr"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.8.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true
