@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+
+	"github.com/carterjones/bittrex/internal"
 )
 
 // RequestParamsRecorder provides a way to record request parameters.
@@ -18,7 +20,7 @@ func (rr *RequestParamsRecorder) SaveParams(r *http.Request) {
 }
 
 func mustReadTestFixture(fixture string) []byte {
-	data, err := Asset("test-fixtures/" + fixture)
+	data, err := internal.Asset("test-fixtures/" + fixture)
 	panicIfErr(err)
 	return data
 }

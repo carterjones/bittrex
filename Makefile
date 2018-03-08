@@ -19,8 +19,8 @@ lint:
 	./...
 
 bindata: bindata_install
-	go-bindata -pkg bittrex test-fixtures
-	go fmt bindata.go
+	go-bindata -pkg internal -o ./internal/bindata.go test-fixtures
+	go fmt ./internal/bindata.go
 
 bindata_install:
 	which bindata &>/dev/null || go get -u github.com/hashicorp/go-bindata/...
