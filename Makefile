@@ -14,7 +14,7 @@ lint:
 	--disable gotypex \
 	--enable nakedret \
 	--exclude "/usr/local/go/src/" \
-	--exclude "bindata.go" \
+	--exclude "internal/bindata.go" \
 	--vendor \
 	./...
 

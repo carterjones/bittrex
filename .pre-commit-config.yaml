@@ -17,4 +17,4 @@ repos:
         - --vendor
         - --cyclo-over=12
         - --enable=nakedret
-        - --exclude=bindata.go
+        - --exclude=internal/bindata.go
