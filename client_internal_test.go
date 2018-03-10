@@ -66,7 +66,7 @@ func TestClient_Start(t *testing.T) {
 		tc.client.signalrC.Host = strings.Replace(ts.URL, "http://", "", -1)
 		tc.client.signalrC.Scheme = signalr.HTTP
 
-		err := tc.client.Start()
+		err := tc.client.Start(func(Trade) {}, func(error) {})
 		if tc.wantErr != "" {
 			errMatches(t, id, err, tc.wantErr)
 			equals(t, id, false, tc.client.started)
@@ -101,17 +101,6 @@ func TestNewUnstarted(t *testing.T) {
 }
 
 func equalsClient(t *testing.T, id string, c1 *Client, c2 *Client) {
-	// First, check for values that will be simply not nil.
-	notNil(t, id, c1.trades)
-	notNil(t, id, c1.errs)
-
-	// Next, zero those non-nil values out to be nil, so we can more
-	// generically do a deep equal check on the rest of the structure.
-	c1.trades = nil
-	c1.errs = nil
-	c2.trades = nil
-	c2.errs = nil
-
 	// Verify the base settings of the SignalR client were set.
 	equals(t, id, c1.signalrC.Host, "socket.bittrex.com")
 	equals(t, id, c1.signalrC.Protocol, "1.5")

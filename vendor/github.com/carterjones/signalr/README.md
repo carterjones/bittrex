@@ -12,7 +12,9 @@ platforms that use SignalR.
 
 It supports CloudFlare-protected sites by default.
 
-## Example basic usage
+## Examples
+
+Simple example:
 
 ```go
 package main
@@ -24,92 +26,41 @@ import (
 )
 
 func main() {
-	host := "myhost.not-real-tld"
-	protocol := "some-protocol-version-123"
-	endpoint := "/usually/something/like/this"
-	connectionData := `{"custom":"data"}`
-
 	// Prepare a SignalR client.
-	c := signalr.New(host, protocol, endpoint, connectionData, nil)
+	c := signalr.New(
+		"fake-server.definitely-not-real",
+		"1.5",
+		"/signalr",
+		`[{"name":"awesomehub"}]`,
+		nil,
+	)
+
+	// Define message and error handlers.
+	msgHandler := func(msg signalr.Message) { log.Println(msg) }
+	panicIfErr := func(err error) {
+		if err != nil {
+			log.Panic(err)
+		}
+	}
 
 	// Start the connection.
-	msgs, errs, err := c.Run()
-	if err != nil {
-		log.Panic(err)
-	}
+	err := c.Run(msgHandler, panicIfErr)
+	panicIfErr(err)
 
-	// Process messages and errors.
-	for {
-		select {
-		case msg := <-msgs:
-			// Handle the message.
-			log.Println(msg)
-		case err := <-errs:
-			// Handle the error.
-			log.Panic(err)
-		}
-	}
+	// Wait indefinitely.
+	select {}
 }
 ```
 
-## Example complex usage
+Generic usage:
 
-```go
-package main
+- [Basic usage](https://github.com/carterjones/signalr/blob/master/examples/basic/main.go)
+- [Complex usage](https://github.com/carterjones/signalr/blob/master/examples/complex/main.go)
 
-import (
-	"log"
+Cryptocurrency examples:
 
-	"github.com/carterjones/signalr"
-)
-
-func main() {
-	host := "myhost.not-real-tld"
-	protocol := "some-protocol-version-123"
-	endpoint := "/usually/something/like/this"
-	connectionData := `{"custom":"data"}`
-	params := map[string]string{"custom-key": "custom-value"}
-
-	// Prepare a SignalR client.
-	c := signalr.New(host, protocol, endpoint, connectionData, params)
-
-	// Perform any optional modifications to the client here. Read the docs for
-	// all the available options that are exposed via public fields.
-
-	// Manually perform the initialization routine.
-	err := c.Negotiate()
-	if err != nil {
-		log.Panic(err)
-	}
-	conn, err := c.Connect()
-	if err != nil {
-		log.Panic(err)
-	}
-	err = c.Start(conn)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	// Create message and error channels.
-	msgs := make(chan signalr.Message)
-	errs := make(chan error)
-
-	// Begin the message reading loop.
-	go c.ReadMessages(msgs, errs)
-
-	// Process messages and errors.
-	for {
-		select {
-		case msg := <-msgs:
-			// Handle the message.
-			log.Println(msg)
-		case err := <-errs:
-			// Handle the error.
-			log.Panic(err)
-		}
-	}
-}
-```
+- [Bittrex](https://github.com/carterjones/signalr/blob/master/examples/bittrex/main.go)
+- [Cryptopia](https://github.com/carterjones/signalr/blob/master/examples/cryptopia/main.go)
 
 # Documentation
 

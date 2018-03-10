@@ -64,11 +64,3 @@ func ok(tb testing.TB, id string, err error) {
 			filepath.Base(file), line, id, err.Error())
 	}
 }
-
-func notNil(tb testing.TB, id string, act interface{}) {
-	if act == nil {
-		_, file, line, _ := runtime.Caller(1)
-		tb.Errorf(red("%s:%d (%s):\n\texp: a non-nil value\n\tgot: %#v\n"),
-			filepath.Base(file), line, id, act)
-	}
-}

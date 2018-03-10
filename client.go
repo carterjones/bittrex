@@ -42,12 +42,6 @@ type Client struct {
 	// message.
 	currentMsgID int
 
-	// Trade channel that funnels trades from the SignalR connection.
-	trades chan Trade
-
-	// Error channel created by the SignalR initialization.
-	errs chan error
-
 	// Started indicates if the underlying SignalR client has been started.
 	started bool
 
@@ -179,8 +173,8 @@ func (c *Client) Cancel(orderUUID string) error {
 
 // Subscribe sends a request to Bittrex to start sending us the market data for
 // the indicated market.
-func (c *Client) Subscribe(market string) error {
-	err := c.websocketReady()
+func (c *Client) Subscribe(market string, tradeHandler TradeHandler, errHandler ErrHandler) error {
+	err := c.websocketReady(tradeHandler, errHandler)
 	if err != nil {
 		return errors.Wrap(err, "underlying signalr client is not ready")
 	}
@@ -255,22 +249,6 @@ func (c *Client) Ticks(market string) ([]Tick, error) {
 	return ts, nil
 }
 
-// Trades pumps out any available trades to the channel receiver. If any errors
-// are encountered at any point during processing, they are sent to the error
-// channel, processing stops, and the function returns.
-func (c *Client) Trades() (<-chan Trade, <-chan error, error) {
-	if c.trades == nil || c.errs == nil {
-		return nil, nil, errors.New("bittrex client has not been initialized")
-	}
-
-	err := c.websocketReady()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "underlying signalr client is not ready")
-	}
-
-	return c.trades, c.errs, nil
-}
-
 // SetCustomID assigns the specified id to the underlying SignalR client.
 func (c *Client) SetCustomID(id string) error {
 	if c.signalrC == nil {
@@ -281,29 +259,30 @@ func (c *Client) SetCustomID(id string) error {
 	return nil
 }
 
-func (c *Client) websocketReady() error {
+func (c *Client) websocketReady(tradeHandler TradeHandler, errHandler ErrHandler) error {
 	if c.signalrC == nil {
 		return errors.New("underlying signalr client is not initialized")
 	}
 	if !c.started {
-		return c.Start()
+		return c.Start(tradeHandler, errHandler)
 	}
 	return nil
 }
 
 // Start causes the Bittrex client to begin processing messages.
-func (c *Client) Start() error {
+func (c *Client) Start(tradeHandler TradeHandler, errHandler ErrHandler) error {
 	var msgs chan signalr.Message
 
 	// Initialize the SignalR client.
 	var err error
-	msgs, c.errs, err = c.signalrC.Run()
+	msgHandler := func(msg signalr.Message) { msgs <- msg }
+	err = c.signalrC.Run(msgHandler, signalr.ErrHandler(errHandler))
 	if err != nil {
 		return errors.Wrap(err, "failed to start the underlying SignalR client")
 	}
 
 	// Process the messages.
-	go processMessages(msgs, c.trades, c.errs)
+	go processMessages(msgs, tradeHandler, errHandler)
 
 	c.started = true
 
@@ -313,13 +292,6 @@ func (c *Client) Start() error {
 // New creates a new Bittrex client.
 func New(apiKey, apiSecret string) *Client {
 	c := new(Client)
-
-	// Initialize the errs channel. This will be overwritten in the event of a
-	// successful connection.
-	c.errs = make(chan error)
-
-	// Prepare channels to be used while processing the SignalR messages.
-	c.trades = make(chan Trade)
 
 	// Set the API key and secret.
 	c.APIKey = apiKey
@@ -349,17 +321,23 @@ func New(apiKey, apiSecret string) *Client {
 	return c
 }
 
+// TradeHandler processes a trade.
+type TradeHandler func(t Trade)
+
+// ErrHandler processes an error.
+type ErrHandler func(err error)
+
 // This processes SignalR messages.
-func processMessages(msgs chan signalr.Message, trades chan Trade, errs chan error) {
+func processMessages(msgs chan signalr.Message, tradeHandler TradeHandler, errHandler ErrHandler) {
 	for msg := range msgs {
-		if !processMessage(msg, trades, errs) {
+		if !processMessage(msg, tradeHandler, errHandler) {
 			return
 		}
 	}
 }
 
 // Process a single SignalR message.
-func processMessage(msg signalr.Message, trades chan Trade, errs chan error) bool {
+func processMessage(msg signalr.Message, tradeHandler TradeHandler, errHandler ErrHandler) bool {
 	// Assume that the message is successfully processed. Prove otherwise.
 	ok := true
 
@@ -372,7 +350,7 @@ func processMessage(msg signalr.Message, trades chan Trade, errs chan error) boo
 
 		// Process each of the arguments.
 		for _, arg := range bittrexMsg.A {
-			ok = processBittrexMsgArg(arg, trades, errs)
+			ok = processBittrexMsgArg(arg, tradeHandler, errHandler)
 			if !ok {
 				return false
 			}
@@ -383,19 +361,17 @@ func processMessage(msg signalr.Message, trades chan Trade, errs chan error) boo
 }
 
 // Process a single argument from a Bittrex message.
-func processBittrexMsgArg(arg interface{}, trades chan Trade, errs chan error) bool {
+func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler ErrHandler) bool {
 	data, err := json.Marshal(arg)
 	if err != nil {
-		err = errors.Wrap(err, "json marshal failed")
-		errs <- err
+		errHandler(errors.Wrap(err, "json marshal failed"))
 		return false
 	}
 
 	var eu exchangeUpdate
 	err = json.Unmarshal(data, &eu)
 	if err != nil {
-		err = errors.Wrap(err, "json unmarshal failed")
-		errs <- err
+		errHandler(errors.Wrap(err, "json unmarshal failed"))
 		return false
 	}
 
@@ -411,27 +387,25 @@ func processBittrexMsgArg(arg interface{}, trades chan Trade, errs chan error) b
 		case "SELL":
 			tType = SellType
 		default:
-			err = errors.Errorf("invalid trade type: %v", t.OrderType)
-			errs <- err
+			errHandler(errors.Errorf("invalid trade type: %v", t.OrderType))
 			return false
 		}
 
 		var parsedTime time.Time
 		parsedTime, err = t.time()
 		if err != nil {
-			err = errors.Wrap(err, "time parse error")
-			errs <- err
+			errHandler(errors.Wrap(err, "time parse error"))
 			return false
 		}
 
-		trades <- Trade{
+		tradeHandler(Trade{
 			BaseCurrency:   bc,
 			MarketCurrency: mc,
 			Type:           tType,
 			Price:          t.Rate,
 			Quantity:       t.Quantity,
 			Time:           parsedTime,
-		}
+		})
 	}
 
 	// If we made it to this point, then the argument was successfully
