@@ -369,14 +369,14 @@ func processMessage(msg signalr.Message, tradeHandler TradeHandler, errHandler E
 func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler ErrHandler) bool {
 	data, err := json.Marshal(arg)
 	if err != nil {
-		errHandler(errors.Wrap(err, "json marshal failed"))
+		go errHandler(errors.Wrap(err, "json marshal failed"))
 		return false
 	}
 
 	var eu exchangeUpdate
 	err = json.Unmarshal(data, &eu)
 	if err != nil {
-		errHandler(errors.Wrap(err, "json unmarshal failed"))
+		go errHandler(errors.Wrap(err, "json unmarshal failed"))
 		return false
 	}
 
@@ -392,18 +392,18 @@ func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler
 		case "SELL":
 			tType = SellType
 		default:
-			errHandler(errors.Errorf("invalid trade type: %v", t.OrderType))
+			go errHandler(errors.Errorf("invalid trade type: %v", t.OrderType))
 			return false
 		}
 
 		var parsedTime time.Time
 		parsedTime, err = t.time()
 		if err != nil {
-			errHandler(errors.Wrap(err, "time parse error"))
+			go errHandler(errors.Wrap(err, "time parse error"))
 			return false
 		}
 
-		tradeHandler(Trade{
+		go tradeHandler(Trade{
 			BaseCurrency:   bc,
 			MarketCurrency: mc,
 			Type:           tType,
