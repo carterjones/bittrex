@@ -403,6 +403,8 @@ func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler
 			return false
 		}
 
+		// BUG(carter): only one trade handler is ever registered even if multiple channels are subscribed to
+		// TODO(carter): track all the trade handlers and iterate over them right here
 		go tradeHandler(Trade{
 			BaseCurrency:   bc,
 			MarketCurrency: mc,
