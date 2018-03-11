@@ -47,6 +47,10 @@ type Client struct {
 	started    bool
 	startedMux sync.Mutex
 
+	// tradeHandlers holds all of the registered trade handler functions.
+	tradeHandlers    []TradeHandler
+	tradeHandlersMux sync.Mutex
+
 	// HostAddr address is the address of the Bittrex server providing the service
 	// we're using. Using this variable allows us to more simply test
 	// functionality in this package.
@@ -175,8 +179,8 @@ func (c *Client) Cancel(orderUUID string) error {
 
 // Subscribe sends a request to Bittrex to start sending us the market data for
 // the indicated market.
-func (c *Client) Subscribe(market string, tradeHandler TradeHandler, errHandler ErrHandler) error {
-	err := c.websocketReady(tradeHandler, errHandler)
+func (c *Client) Subscribe(market string, errHandler ErrHandler) error {
+	err := c.websocketReady(errHandler)
 	if err != nil {
 		return errors.Wrap(err, "underlying signalr client is not ready")
 	}
@@ -199,7 +203,15 @@ func (c *Client) Subscribe(market string, tradeHandler TradeHandler, errHandler 
 	return nil
 }
 
-func (c *Client) websocketReady(tradeHandler TradeHandler, errHandler ErrHandler) error {
+// Register saves the specified trade handler to a slice of handlers that will
+// be run against each incoming trade.
+func (c *Client) Register(h TradeHandler) {
+	c.tradeHandlersMux.Lock()
+	defer c.tradeHandlersMux.Unlock()
+	c.tradeHandlers = append(c.tradeHandlers, h)
+}
+
+func (c *Client) websocketReady(errHandler ErrHandler) error {
 	// Return if no SignalR client exists.
 	if c.signalrC == nil {
 		return errors.New("underlying signalr client is not initialized")
@@ -225,7 +237,7 @@ func (c *Client) websocketReady(tradeHandler TradeHandler, errHandler ErrHandler
 	}
 
 	// Process the messages.
-	go processMessages(msgs, tradeHandler, errHandler)
+	go c.processMessages(msgs, errHandler)
 
 	c.started = true
 
@@ -333,16 +345,16 @@ type TradeHandler func(t Trade)
 type ErrHandler func(err error)
 
 // This processes SignalR messages.
-func processMessages(msgs chan signalr.Message, tradeHandler TradeHandler, errHandler ErrHandler) {
+func (c *Client) processMessages(msgs chan signalr.Message, errHandler ErrHandler) {
 	for msg := range msgs {
-		if !processMessage(msg, tradeHandler, errHandler) {
+		if !c.processMessage(msg, errHandler) {
 			return
 		}
 	}
 }
 
 // Process a single SignalR message.
-func processMessage(msg signalr.Message, tradeHandler TradeHandler, errHandler ErrHandler) bool {
+func (c *Client) processMessage(msg signalr.Message, errHandler ErrHandler) bool {
 	// Assume that the message is successfully processed. Prove otherwise.
 	ok := true
 
@@ -355,7 +367,7 @@ func processMessage(msg signalr.Message, tradeHandler TradeHandler, errHandler E
 
 		// Process each of the arguments.
 		for _, arg := range bittrexMsg.A {
-			ok = processBittrexMsgArg(arg, tradeHandler, errHandler)
+			ok = c.processBittrexMsgArg(arg, errHandler)
 			if !ok {
 				return false
 			}
@@ -366,7 +378,7 @@ func processMessage(msg signalr.Message, tradeHandler TradeHandler, errHandler E
 }
 
 // Process a single argument from a Bittrex message.
-func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler ErrHandler) bool {
+func (c *Client) processBittrexMsgArg(arg interface{}, errHandler ErrHandler) bool {
 	data, err := json.Marshal(arg)
 	if err != nil {
 		go errHandler(errors.Wrap(err, "json marshal failed"))
@@ -396,6 +408,7 @@ func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler
 			return false
 		}
 
+		// Parse the time.
 		var parsedTime time.Time
 		parsedTime, err = t.time()
 		if err != nil {
@@ -403,16 +416,22 @@ func processBittrexMsgArg(arg interface{}, tradeHandler TradeHandler, errHandler
 			return false
 		}
 
-		// BUG(carter): only one trade handler is ever registered even if multiple channels are subscribed to
-		// TODO(carter): track all the trade handlers and iterate over them right here
-		go tradeHandler(Trade{
+		// Create a new trade.
+		t := Trade{
 			BaseCurrency:   bc,
 			MarketCurrency: mc,
 			Type:           tType,
 			Price:          t.Rate,
 			Quantity:       t.Quantity,
 			Time:           parsedTime,
-		})
+		}
+
+		// Process the trade using the trade handlers.
+		c.tradeHandlersMux.Lock()
+		for _, h := range c.tradeHandlers {
+			go h(t)
+		}
+		c.tradeHandlersMux.Unlock()
 	}
 
 	// If we made it to this point, then the argument was successfully
