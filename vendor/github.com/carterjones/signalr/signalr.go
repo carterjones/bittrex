@@ -567,7 +567,7 @@ func (c *Client) processReadMessagesMessage(p []byte, msgHandler MsgHandler, err
 	var msg Message
 	err := json.Unmarshal(p, &msg)
 	if err != nil {
-		errHandler(errors.Wrap(err, "json unmarshal failed"))
+		go errHandler(errors.Wrap(err, "json unmarshal failed"))
 		return
 	}
 
@@ -581,7 +581,7 @@ func (c *Client) processReadMessagesMessage(p []byte, msgHandler MsgHandler, err
 		c.MessageID.Set(msg.C)
 	}
 
-	msgHandler(msg)
+	go msgHandler(msg)
 }
 
 func (c *Client) processReadMessagesError(err error, errHandler ErrHandler) bool {
@@ -601,7 +601,7 @@ func (c *Client) processReadMessagesError(err error, errHandler ErrHandler) bool
 		// abnormal closure
 		ok = c.attemptReconnect()
 	default:
-		errHandler(err)
+		go errHandler(err)
 	}
 
 	return ok
@@ -655,8 +655,8 @@ func (c *Client) Send(m hubs.ClientMsg) error {
 // have completed.
 func (c *Client) SetConn(conn WebsocketConn) {
 	c.connMux.Lock()
+	defer c.connMux.Unlock()
 	c.conn = conn
-	c.connMux.Unlock()
 }
 
 // Conn returns the underlying websocket connection.

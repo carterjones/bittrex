@@ -14,7 +14,7 @@
     ".",
     "hubs"
   ]
-  revision = "eed17e92bf83485e2cc6d6af78f796c24df07e27"
+  revision = "6d6d1da9b8873469f03857bc1b8af1764fac304a"
 
 [[projects]]
   name = "github.com/gorilla/websocket"
