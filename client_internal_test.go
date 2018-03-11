@@ -40,7 +40,7 @@ func TestClient_SetCustomID(t *testing.T) {
 	}
 }
 
-func TestClient_Start(t *testing.T) {
+func TestClient_Subscribe(t *testing.T) {
 	cases := map[string]struct {
 		client   *Client
 		serverFn http.HandlerFunc
@@ -66,7 +66,7 @@ func TestClient_Start(t *testing.T) {
 		tc.client.signalrC.Host = strings.Replace(ts.URL, "http://", "", -1)
 		tc.client.signalrC.Scheme = signalr.HTTP
 
-		err := tc.client.Start(func(Trade) {}, func(error) {})
+		err := tc.client.Subscribe("BTC-LTC", func(Trade) {}, func(error) {})
 		if tc.wantErr != "" {
 			errMatches(t, id, err, tc.wantErr)
 			equals(t, id, false, tc.client.started)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/carterjones/signalr"
@@ -43,7 +44,8 @@ type Client struct {
 	currentMsgID int
 
 	// Started indicates if the underlying SignalR client has been started.
-	started bool
+	started    bool
+	startedMux sync.Mutex
 
 	// HostAddr address is the address of the Bittrex server providing the service
 	// we're using. Using this variable allows us to more simply test
@@ -197,6 +199,39 @@ func (c *Client) Subscribe(market string, tradeHandler TradeHandler, errHandler 
 	return nil
 }
 
+func (c *Client) websocketReady(tradeHandler TradeHandler, errHandler ErrHandler) error {
+	// Return if no SignalR client exists.
+	if c.signalrC == nil {
+		return errors.New("underlying signalr client is not initialized")
+	}
+
+	// Protect the started flag.
+	c.startedMux.Lock()
+	defer c.startedMux.Unlock()
+
+	// Return if the client has already been started.
+	if c.started {
+		return nil
+	}
+
+	// Prepare a message channel.
+	msgs := make(chan signalr.Message)
+
+	// Initialize the SignalR client.
+	msgHandler := func(msg signalr.Message) { msgs <- msg }
+	err := c.signalrC.Run(msgHandler, signalr.ErrHandler(errHandler))
+	if err != nil {
+		return errors.Wrap(err, "failed to start the underlying SignalR client")
+	}
+
+	// Process the messages.
+	go processMessages(msgs, tradeHandler, errHandler)
+
+	c.started = true
+
+	return nil
+}
+
 // Ticks gets a little under 10 days of candle data (14365 minutes) at the one
 // minute interval. However, it is usually missing the last few minutes, so a
 // way to monitor trades (such as the Trades() function) is still required to
@@ -256,36 +291,6 @@ func (c *Client) SetCustomID(id string) error {
 	}
 
 	c.signalrC.CustomID = id
-	return nil
-}
-
-func (c *Client) websocketReady(tradeHandler TradeHandler, errHandler ErrHandler) error {
-	if c.signalrC == nil {
-		return errors.New("underlying signalr client is not initialized")
-	}
-	if !c.started {
-		return c.Start(tradeHandler, errHandler)
-	}
-	return nil
-}
-
-// Start causes the Bittrex client to begin processing messages.
-func (c *Client) Start(tradeHandler TradeHandler, errHandler ErrHandler) error {
-	var msgs chan signalr.Message
-
-	// Initialize the SignalR client.
-	var err error
-	msgHandler := func(msg signalr.Message) { msgs <- msg }
-	err = c.signalrC.Run(msgHandler, signalr.ErrHandler(errHandler))
-	if err != nil {
-		return errors.Wrap(err, "failed to start the underlying SignalR client")
-	}
-
-	// Process the messages.
-	go processMessages(msgs, tradeHandler, errHandler)
-
-	c.started = true
-
 	return nil
 }
 
