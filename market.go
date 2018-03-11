@@ -8,10 +8,14 @@ type Market struct {
 	MarketCurrencyLong string
 	BaseCurrencyLong   string
 	MinTradeSize       float64
-	MarketName         string
+	Name               string `json:"MarketName"`
 	IsActive           bool
 	Created            string
 	Notice             *string
 	IsSponsored        *bool
 	LogoURL            string `json:"LogoUrl"`
+}
+
+func (m Market) String() string {
+	return m.Name
 }
