@@ -306,6 +306,105 @@ func (c *Client) SetCustomID(id string) error {
 	return nil
 }
 
+// ProcessCandles monitors the trade data for all subscribed markets and
+// produces candle data for the specified interval.
+func (c *Client) ProcessCandles(interval time.Duration, candleHandler CandleHandler) {
+	// Register a handler to funnel each trade to a trades channel.
+	trades := make(chan Trade)
+	c.Register(func(t Trade) { trades <- t })
+
+	// Create a holding place for the candles for this interval.
+	candles := make(map[string]Candle)
+	candlesMux := sync.Mutex{}
+
+	// Start a goroutine that updates candle values as each trade comes in.
+	go func() {
+		for {
+			t := <-trades
+
+			candlesMux.Lock()
+
+			var candle Candle
+			var ok bool
+			if candle, ok = candles[t.Market()]; !ok {
+				// If the candle does not already exist, then create one.
+				candles[t.Market()] = Candle{
+					Market: t.Market(),
+					Open:   t.Price,
+					High:   t.Price,
+					Low:    t.Price,
+					Close:  t.Price,
+				}
+
+				// Move to the next trade.
+				candlesMux.Unlock()
+				continue
+			}
+
+			// If the candle does exist, then modify it as necessary.
+
+			// Set the open value if none is set.
+			if candle.Open == 0.0 {
+				candle.Open = t.Price
+			}
+
+			// Set the high value.
+			if t.Price > candle.High {
+				candle.High = t.Price
+			}
+
+			// Set the low value.
+			if t.Price < candle.Low {
+				candle.Low = t.Price
+			}
+
+			// Set the last price. This will eventually be used as the close
+			// value.
+			candle.Close = t.Price
+
+			// Save the new value.
+			candles[t.Market()] = candle
+
+			candlesMux.Unlock()
+		}
+	}()
+
+	// Start a goroutine that waits for the specified interval, prints the
+	// current candle values, and then resets the candle map.
+	go func() {
+		for {
+			// Wait for the specified interval.
+			<-time.After(interval)
+
+			// Save the current time.
+			now := time.Now()
+
+			// Lock the map.
+			candlesMux.Lock()
+
+			// Iterate over the candles for this interval.
+			for k, v := range candles {
+				// Set the time to now minus the specified interval. This
+				// represents when the interval started.
+				v.Time = now.Add(-1 * interval)
+
+				// Process the candle.
+				go candleHandler(v)
+
+				// Update the candle values so they carry over data to the next
+				// interval.
+				v.Open = v.Close
+				v.High = v.Close
+				v.Low = v.Close
+				candles[k] = v
+			}
+
+			// Unlock the map.
+			candlesMux.Unlock()
+		}
+	}()
+}
+
 // New creates a new Bittrex client.
 func New(apiKey, apiSecret string) *Client {
 	c := new(Client)
@@ -340,6 +439,9 @@ func New(apiKey, apiSecret string) *Client {
 
 // TradeHandler processes a trade.
 type TradeHandler func(t Trade)
+
+// CandleHandler processes a candle.
+type CandleHandler func(c Candle)
 
 // ErrHandler processes an error.
 type ErrHandler func(err error)
