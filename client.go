@@ -1,5 +1,8 @@
 package bittrex
 
+//go:generate go-bindata -pkg internal -nometadata -o ./internal/bindata.go test-fixtures
+//go:generate go fmt ./internal/bindata.go
+
 import (
 	"encoding/json"
 	"net/http"

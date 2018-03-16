@@ -1,4 +1,5 @@
 build: bindata
+	go generate ./...
 	go build ./...
 
 test:
@@ -18,12 +19,8 @@ lint:
 	--vendor \
 	./...
 
-bindata: bindata_install
-	go-bindata -pkg internal -o ./internal/bindata.go test-fixtures
-	go fmt ./internal/bindata.go
-
-bindata_install:
-	which bindata &>/dev/null || go get -u github.com/hashicorp/go-bindata/...
+bindata:
+	which go-bindata &>/dev/null || go get -u github.com/kevinburke/go-bindata/...
 
 update:
 	dep ensure -update

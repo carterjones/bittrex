@@ -86,7 +86,7 @@ func testFixturesAccount_getbalancesJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "test-fixtures/account_getbalances.json", size: 485, mode: os.FileMode(420), modTime: time.Unix(1520485979, 0)}
+	info := bindataFileInfo{name: "test-fixtures/account_getbalances.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -106,7 +106,7 @@ func testFixturesAccount_getorderhistoryJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "test-fixtures/account_getorderhistory.json", size: 967, mode: os.FileMode(420), modTime: time.Unix(1520485979, 0)}
+	info := bindataFileInfo{name: "test-fixtures/account_getorderhistory.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -126,7 +126,7 @@ func testFixturesPub_market_getticksJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "test-fixtures/pub_market_getticks.json", size: 1435208, mode: os.FileMode(420), modTime: time.Unix(1520485979, 0)}
+	info := bindataFileInfo{name: "test-fixtures/pub_market_getticks.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -146,7 +146,7 @@ func testFixturesPublic_getmarketsJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "test-fixtures/public_getmarkets.json", size: 92556, mode: os.FileMode(420), modTime: time.Unix(1520485979, 0)}
+	info := bindataFileInfo{name: "test-fixtures/public_getmarkets.json", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
