@@ -105,7 +105,7 @@ func equalsClient(t *testing.T, id string, c1 *Client, c2 *Client) {
 	equals(t, id, c1.signalrC.Host, "socket.bittrex.com")
 	equals(t, id, c1.signalrC.Protocol, "1.5")
 	equals(t, id, c1.signalrC.Endpoint, "/signalr")
-	equals(t, id, c1.signalrC.ConnectionData, `[{"name":"corehub"}]`)
+	equals(t, id, c1.signalrC.ConnectionData, `[{"name":"c2"}]`)
 
 	// Verify the transport was set to the CloudFlare scraper transport.
 	if _, ok := c1.signalrC.HTTPClient.Transport.(*cfscraper.Transport); !ok {

@@ -424,7 +424,7 @@ func New(apiKey, apiSecret string) *Client {
 		"socket.bittrex.com",
 		"1.5",
 		"/signalr",
-		`[{"name":"corehub"}]`,
+		`[{"name":"c2"}]`,
 		nil,
 	)
 
