@@ -8,13 +8,13 @@
   version = "v0.1.2"
 
 [[projects]]
-  branch = "master"
   name = "github.com/carterjones/signalr"
   packages = [
     ".",
     "hubs"
   ]
-  revision = "89082bb22fbe543529bea2e211c18335e5db20d1"
+  revision = "87bca142828d05d20c2fcca3dbf93bbfd6cea8cf"
+  version = "v0.3.2"
 
 [[projects]]
   name = "github.com/gorilla/websocket"
@@ -40,7 +40,7 @@
     "registry",
     "token"
   ]
-  revision = "6c383dd335ef8dcccef05e651ce1eccfe4d0f011"
+  revision = "03d472dc43abece8691e609a23d295ab732abba6"
 
 [[projects]]
   name = "gopkg.in/sourcemap.v1"
