@@ -19,8 +19,9 @@ func TestTick_String(t *testing.T) {
 				High:      3.0,
 				Low:       1.0,
 				Close:     2.2,
+				Volume:    9000.1,
 			},
-			exp: "faketimestamp: O:2.10000000, H:3.00000000, L:1.00000000, C:2.20000000",
+			exp: "faketimestamp: O:2.10000000, H:3.00000000, L:1.00000000, C:2.20000000, V:9000.10000000",
 		},
 	}
 

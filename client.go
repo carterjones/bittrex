@@ -337,6 +337,7 @@ func (c *Client) ProcessCandles(interval time.Duration, candleHandler CandleHand
 					High:   t.Price,
 					Low:    t.Price,
 					Close:  t.Price,
+					Volume: t.Quantity,
 				}
 
 				// Move to the next trade.
@@ -364,6 +365,9 @@ func (c *Client) ProcessCandles(interval time.Duration, candleHandler CandleHand
 			// Set the last price. This will eventually be used as the close
 			// value.
 			candle.Close = t.Price
+
+			// Increase the volume.
+			candle.Volume += t.Quantity
 
 			// Save the new value.
 			candles[t.Market()] = candle

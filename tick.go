@@ -40,7 +40,8 @@ func (t Tick) String() string {
 		"O:" + strconv.FormatFloat(t.Open, 'f', 8, 64) +
 		", H:" + strconv.FormatFloat(t.High, 'f', 8, 64) +
 		", L:" + strconv.FormatFloat(t.Low, 'f', 8, 64) +
-		", C:" + strconv.FormatFloat(t.Close, 'f', 8, 64)
+		", C:" + strconv.FormatFloat(t.Close, 'f', 8, 64) +
+		", V:" + strconv.FormatFloat(t.Volume, 'f', 8, 64)
 }
 
 // Time returns a time object that is converted from the timestamp value.
