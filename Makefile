@@ -24,5 +24,4 @@ bindata:
 
 update:
 	dep ensure -update
-	git checkout -- vendor/github.com/gorilla # This is due to whitespace issues.
 	pre-commit autoupdate

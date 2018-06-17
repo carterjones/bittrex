@@ -67,6 +67,9 @@ type Client struct {
 	// when contacting the SignalR service.
 	RetryWaitDuration time.Duration
 
+	// The maximum amount of time to spend retrying a reconnect attempt.
+	MaxReconnectAttemptDuration time.Duration
+
 	// This is the connection token set during the negotiate phase of the
 	// protocol and used to uniquely identify the connection to the server
 	// in all subsequent phases of the connection.
@@ -269,7 +272,7 @@ func (c *Client) Reconnect() (*websocket.Conn, error) {
 	}
 
 	// Once complete, set the new connection for this client.
-	c.conn = conn
+	c.SetConn(conn)
 
 	return conn, nil
 }
@@ -510,18 +513,6 @@ func (c *Client) ReadMessages(msgHandler MsgHandler, errHandler ErrHandler) {
 }
 
 func (c *Client) readMessage(msgHandler MsgHandler, errHandler ErrHandler) bool {
-	c.connMux.Lock()
-
-	// Set up a channel to receive signals from the Client.readMessage
-	// function as well as the goroutine that does the actual
-	// Client.conn.read. This way, the unlock operation is synchronized.
-	unlockCh := make(chan bool, 2)
-	go func() {
-		<-unlockCh
-		<-unlockCh
-		c.connMux.Unlock()
-	}()
-
 	// Set the ok flag to true to indicate that more messages can/should be
 	// read. Set the flag to false later on if this is no longer the case.
 	ok := true
@@ -532,28 +523,33 @@ func (c *Client) readMessage(msgHandler MsgHandler, errHandler ErrHandler) bool 
 
 	// Wait for a message.
 	go func() {
+		c.connMux.Lock()
 		_, p, err := c.conn.ReadMessage()
+		c.connMux.Unlock()
 		if err != nil {
 			errs <- err
 		} else {
 			pCh <- p
 		}
-
-		// Send a signal that the inner function is done processing.
-		unlockCh <- true
 	}()
 
 	select {
 	case p := <-pCh:
 		c.processReadMessagesMessage(p, msgHandler, errHandler)
 	case err := <-errs:
-		ok = c.processReadMessagesError(err, errHandler)
+		errHandled := make(chan bool)
+		go func() {
+			v := c.processReadMessagesError(err, errHandler)
+			errHandled <- v
+		}()
+		select {
+		case ok = <-errHandled:
+		case <-c.close:
+			ok = false
+		}
 	case <-c.close:
 		ok = false
 	}
-
-	// Send a signal that the outer function is done processing.
-	unlockCh <- true
 
 	return ok
 }
@@ -599,7 +595,18 @@ func (c *Client) processReadMessagesError(err error, errHandler ErrHandler) bool
 		fallthrough
 	case 1006:
 		// abnormal closure
-		ok = c.attemptReconnect()
+		okCh := make(chan bool)
+		go func() {
+			v := c.attemptReconnect()
+			okCh <- v
+		}()
+		select {
+		case ok = <-okCh:
+		case <-time.After(c.MaxReconnectAttemptDuration):
+			// Fail if the retry exceeds the maximum amount of time for
+			// reconnects to last.
+			ok = false
+		}
 	default:
 		go errHandler(err)
 	}
@@ -683,20 +690,21 @@ func New(host, protocol, endpoint, connectionData string, params map[string]stri
 	}
 
 	return &Client{
-		Host:                host,
-		Protocol:            protocol,
-		Endpoint:            endpoint,
-		ConnectionData:      connectionData,
-		close:               make(chan struct{}),
-		HTTPClient:          httpClient,
-		Headers:             make(map[string]string),
-		Params:              params,
-		Scheme:              HTTPS,
-		MaxNegotiateRetries: 5,
-		MaxConnectRetries:   5,
-		MaxReconnectRetries: 5,
-		MaxStartRetries:     5,
-		RetryWaitDuration:   1 * time.Minute,
+		Host:                        host,
+		Protocol:                    protocol,
+		Endpoint:                    endpoint,
+		ConnectionData:              connectionData,
+		close:                       make(chan struct{}),
+		HTTPClient:                  httpClient,
+		Headers:                     make(map[string]string),
+		Params:                      params,
+		Scheme:                      HTTPS,
+		MaxNegotiateRetries:         5,
+		MaxConnectRetries:           5,
+		MaxReconnectRetries:         5,
+		MaxStartRetries:             5,
+		RetryWaitDuration:           1 * time.Minute,
+		MaxReconnectAttemptDuration: 5 * time.Minute,
 	}
 }
 
