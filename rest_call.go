@@ -57,7 +57,7 @@ func (rc *restCall) addAuthData() {
 	mac := hmac.New(sha512.New, secret)
 	// We ignore the error because the documentation states errors will never be
 	// returned: https://golang.org/pkg/hash/#Hash
-	_, _ = mac.Write([]byte(rc.req.URL.String())) // nolint: gas
+	_, _ = mac.Write([]byte(rc.req.URL.String())) // nolint: gas, gosec
 	sign := mac.Sum(nil)
 	signHex := hex.EncodeToString(sign)
 
